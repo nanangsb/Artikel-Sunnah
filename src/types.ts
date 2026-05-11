@@ -1,5 +1,7 @@
 export interface Article {
+  id: number;
   date: string;
+  slug: string;
   link: string;
   title: {
     rendered: string;
@@ -7,12 +9,17 @@ export interface Article {
   content: {
     rendered: string;
   };
-  author: number | string;
-  categories: (number | string)[];
+  excerpt: {
+    rendered: string;
+  };
+  author: number;
+  categories: number[];
   yoast_head_json?: {
+    og_site_name?: string;
     og_image?: Array<{
       url: string;
     }>;
+    author?: string;
   };
 }
 

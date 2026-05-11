@@ -4,13 +4,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Virtuoso } from 'react-virtuoso';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Article, AppConfig } from './types';
 import { cn } from './lib/utils';
 
 export default function App() {
+  const navigate = useNavigate();
+  const { slug } = useParams();
+  
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedArticleLink, setSelectedArticleLink] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -84,8 +87,8 @@ export default function App() {
   }, [articles]);
 
   const selectedArticle = useMemo(() => 
-    articles.find(a => a.link === selectedArticleLink),
-  [articles, selectedArticleLink]);
+    articles.find(a => a.slug === slug),
+  [articles, slug]);
 
   const handleShare = (platform: 'twitter' | 'facebook' | 'linkedin') => {
     if (!selectedArticle) return;
@@ -192,12 +195,12 @@ export default function App() {
                 id={`article-item-${index}`}
                 key={article.link}
                 onClick={() => {
-                  setSelectedArticleLink(article.link);
+                  navigate(`/${article.slug}`);
                   if (window.innerWidth < 1024) setIsSidebarOpen(false);
                 }}
                 className={cn(
                   "px-4 py-3.5 cursor-pointer border-b border-slate-100 transition-all group",
-                  selectedArticleLink === article.link 
+                  slug === article.slug 
                     ? "bg-blue-50 border-l-4 border-l-blue-600 shadow-[inset_-1px_0_0_rgba(37,99,235,0.1)]" 
                     : "hover:bg-slate-50 border-l-4 border-l-transparent"
                 )}
@@ -205,7 +208,7 @@ export default function App() {
                 <div className="flex justify-between items-start mb-1.5">
                   <p className={cn(
                     "text-[10px] uppercase font-bold tracking-wider",
-                    selectedArticleLink === article.link ? "text-blue-600" : "text-slate-400"
+                    slug === article.slug ? "text-blue-600" : "text-slate-400"
                   )}>
                     {format(parseISO(article.date), 'MMM dd, yyyy')}
                   </p>
@@ -215,7 +218,7 @@ export default function App() {
                 </div>
                 <h3 className={cn(
                   "text-[13px] font-semibold leading-[1.4] transition-colors line-clamp-2",
-                  selectedArticleLink === article.link ? "text-slate-900" : "text-slate-700"
+                  slug === article.slug ? "text-slate-900" : "text-slate-700"
                 )}>
                   {article.title.rendered}
                 </h3>
@@ -308,10 +311,10 @@ export default function App() {
 
                   <div className="flex items-center gap-2 mb-6">
                     <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded uppercase tracking-wider">
-                      Categories: {selectedArticle.categories.join(', ')}
+                      Category {selectedArticle.categories.join(', ')}
                     </span>
                     <span className="text-slate-400 text-xs font-medium">
-                      {format(parseISO(selectedArticle.date), 'MMMM d, yyyy')} • Author ID: {selectedArticle.author}
+                      {format(parseISO(selectedArticle.date), 'MMMM d, yyyy')} • {selectedArticle.yoast_head_json?.author || 'Anonim'}
                     </span>
                   </div>
                   
@@ -319,6 +322,13 @@ export default function App() {
                     {selectedArticle.title.rendered}
                   </h2>
 
+                  {selectedArticle.excerpt.rendered && (
+                    <div 
+                      className="mb-10 text-lg lg:text-xl text-slate-500 font-sans italic border-l-4 border-slate-200 pl-4 leading-relaxed"
+                      dangerouslySetInnerHTML={{ __html: selectedArticle.excerpt.rendered }}
+                    />
+                  )}
+                  
                   <div 
                     id="article-body" 
                     className="prose prose-slate max-w-none font-serif text-[18px] lg:text-[20px] text-slate-700 leading-[1.75] article-content"
