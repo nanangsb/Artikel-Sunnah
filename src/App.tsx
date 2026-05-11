@@ -1,19 +1,16 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Calendar, BookOpen, ChevronLeft, ChevronRight, Menu, X, Clock, User, Tag, Heart, Share2, Facebook, Twitter, Linkedin, ExternalLink, ArrowLeft } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useDeferredValue } from 'react';
+import { Search, Filter, Calendar, BookOpen, ChevronLeft, ChevronRight, Menu, X, Clock, User, Tag, Heart, ExternalLink, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Virtuoso } from 'react-virtuoso';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 import { id as localeId } from 'date-fns/locale';
-import { useNavigate, useParams } from 'react-router-dom';
 import { Article, AppConfig } from './types';
 import { cn } from './lib/utils';
 
 export default function App() {
-  const navigate = useNavigate();
-  const { slug } = useParams();
-  
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedArticleLink, setSelectedArticleLink] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Semua');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -26,6 +23,7 @@ export default function App() {
     }
   });
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   // Persistence
   useEffect(() => {
@@ -38,7 +36,7 @@ export default function App() {
     if (container) {
       container.scrollTo({ top: 0, behavior: 'instant' });
     }
-  }, [slug]);
+  }, [selectedArticleLink]);
 
   useEffect(() => {
     async function loadAllData() {
@@ -71,23 +69,25 @@ export default function App() {
     loadAllData();
   }, []);
 
-  const toggleFavorite = (link: string) => {
+  const toggleFavorite = useCallback((link: string) => {
     setFavorites(prev => 
       prev.includes(link) ? prev.filter(l => l !== link) : [...prev, link]
     );
-  };
+  }, []);
 
   const filteredArticles = useMemo(() => {
+    const searchLower = deferredSearchTerm.toLowerCase();
     return articles.filter(article => {
-      const matchesSearch = article.title.rendered.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           article.content.rendered.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = !deferredSearchTerm || 
+                           article.title.rendered.toLowerCase().includes(searchLower) ||
+                           article.content.rendered.toLowerCase().includes(searchLower);
       
       const matchesCategory = selectedCategory === 'Semua' || article.categories.includes(Number(selectedCategory));
       const matchesFavorite = !showFavoritesOnly || favorites.includes(article.link);
 
       return matchesSearch && matchesCategory && matchesFavorite;
     });
-  }, [articles, searchTerm, selectedCategory, favorites, showFavoritesOnly]);
+  }, [articles, deferredSearchTerm, selectedCategory, favorites, showFavoritesOnly]);
 
   const categories = useMemo(() => {
     const cats = new Set(articles.flatMap(a => a.categories));
@@ -95,22 +95,15 @@ export default function App() {
   }, [articles]);
 
   const selectedArticle = useMemo(() => 
-    articles.find(a => a.slug === slug),
-  [articles, slug]);
+    articles.find(a => a.link === selectedArticleLink),
+  [articles, selectedArticleLink]);
 
-  const handleShare = (platform: 'twitter' | 'facebook' | 'linkedin') => {
-    if (!selectedArticle) return;
-    const url = encodeURIComponent(selectedArticle.link);
-    const title = encodeURIComponent(selectedArticle.title.rendered);
-    
-    const shareUrls = {
-      twitter: `https://twitter.com/intent/tweet?text=${title}&url=${url}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-      linkedin: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`
-    };
-    
-    window.open(shareUrls[platform], '_blank');
-  };
+  const readingTime = useMemo(() => {
+    if (!selectedArticle) return 0;
+    const text = selectedArticle.content.rendered.replace(/<[^>]*>/g, '');
+    const words = text.trim().split(/\s+/).length;
+    return Math.ceil(words / 225);
+  }, [selectedArticle]);
 
   if (loading) {
     return (
@@ -152,13 +145,13 @@ export default function App() {
             <h1 
               id="app-title" 
               className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
-              onClick={() => navigate('/')}
+              onClick={() => setSelectedArticleLink(null)}
             >
               Muslim Archive
             </h1>
             <div className="flex items-center gap-2">
               <button 
-                onClick={() => navigate('/')}
+                onClick={() => setSelectedArticleLink(null)}
                 className="lg:hidden p-1.5 text-slate-400 hover:text-slate-600"
               >
                 <ArrowLeft size={16} />
@@ -213,12 +206,12 @@ export default function App() {
                 id={`article-item-${index}`}
                 key={article.link}
                 onClick={() => {
-                  navigate(`/${article.slug}`);
+                  setSelectedArticleLink(article.link);
                   if (window.innerWidth < 1024) setIsSidebarOpen(false);
                 }}
                 className={cn(
                   "px-4 py-3.5 cursor-pointer border-b border-slate-100 transition-all group",
-                  slug === article.slug 
+                  selectedArticleLink === article.link 
                     ? "bg-blue-50 border-l-4 border-l-blue-600 shadow-[inset_-1px_0_0_rgba(37,99,235,0.1)]" 
                     : "hover:bg-slate-50 border-l-4 border-l-transparent"
                 )}
@@ -226,7 +219,7 @@ export default function App() {
                 <div className="flex justify-between items-start mb-1.5">
                   <p className={cn(
                     "text-[10px] uppercase font-bold tracking-wider",
-                    slug === article.slug ? "text-blue-600" : "text-slate-400"
+                    selectedArticleLink === article.link ? "text-blue-600" : "text-slate-400"
                   )}>
                     {format(parseISO(article.date), 'MMM dd, yyyy')}
                   </p>
@@ -236,7 +229,7 @@ export default function App() {
                 </div>
                 <h3 className={cn(
                   "text-[13px] font-semibold leading-[1.4] transition-colors line-clamp-2",
-                  slug === article.slug ? "text-slate-900" : "text-slate-700"
+                  selectedArticleLink === article.link ? "text-slate-900" : "text-slate-700"
                 )}>
                   {article.title.rendered}
                 </h3>
@@ -245,15 +238,11 @@ export default function App() {
           />
         </div>
 
-        {/* Pagination Footer */}
+        {/* Pagination Footer - Removed for efficiency as we use Virtual Scrolling */}
         <div className="p-3 bg-slate-50 border-t border-slate-200 flex justify-between items-center shrink-0">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
             {filteredArticles.length} Result{filteredArticles.length !== 1 ? 's' : ''}
           </span>
-          <div className="flex gap-1">
-            <button className="px-2 py-1 bg-white border border-slate-300 rounded text-[9px] font-extrabold text-slate-600 hover:bg-slate-100 uppercase tracking-tighter disabled:opacity-50">PREV</button>
-            <button className="px-2 py-1 bg-white border border-slate-300 rounded text-[9px] font-extrabold text-slate-600 hover:bg-slate-100 uppercase tracking-tighter disabled:opacity-50">NEXT</button>
-          </div>
         </div>
       </motion.aside>
 
@@ -286,9 +275,6 @@ export default function App() {
                   <Heart size={18} fill={favorites.includes(selectedArticle.link) ? "currentColor" : "none"} />
                 </button>
                 <div className="h-4 w-[1px] bg-slate-100 mx-1" />
-                <button onClick={() => handleShare('twitter')} className="p-2 text-slate-300 hover:text-blue-400 transition-colors" title="Share to X"><Twitter size={18} /></button>
-                <button onClick={() => handleShare('facebook')} className="p-2 text-slate-300 hover:text-blue-600 transition-colors" title="Share to Facebook"><Facebook size={18} /></button>
-                <button onClick={() => handleShare('linkedin')} className="p-2 text-slate-300 hover:text-blue-700 transition-colors" title="Share to LinkedIn"><Linkedin size={18} /></button>
               </>
             )}
             <a 
@@ -303,7 +289,7 @@ export default function App() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar" id="article-reader-container">
           <AnimatePresence mode="wait">
             {selectedArticle ? (
               <motion.article
@@ -332,7 +318,7 @@ export default function App() {
                       Category {selectedArticle.categories.join(', ')}
                     </span>
                     <span className="text-slate-400 text-xs font-medium">
-                      {format(parseISO(selectedArticle.date), 'MMMM d, yyyy')} • {selectedArticle.yoast_head_json?.author || 'Anonim'}
+                      {format(parseISO(selectedArticle.date), 'MMMM d, yyyy')} • {selectedArticle.yoast_head_json?.author || 'Anonim'} • {readingTime} min read
                     </span>
                   </div>
                   
