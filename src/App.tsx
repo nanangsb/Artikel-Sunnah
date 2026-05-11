@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, Calendar, BookOpen, ChevronLeft, ChevronRight, Menu, X, Clock, User, Tag, Heart, Share2, Facebook, Twitter, Linkedin, ExternalLink } from 'lucide-react';
+import { Search, Filter, Calendar, BookOpen, ChevronLeft, ChevronRight, Menu, X, Clock, User, Tag, Heart, Share2, Facebook, Twitter, Linkedin, ExternalLink, ArrowLeft } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Virtuoso } from 'react-virtuoso';
 import { format, parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
@@ -31,6 +31,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('article_favorites', JSON.stringify(favorites));
   }, [favorites]);
+
+  // Scroll to top when article changes
+  useEffect(() => {
+    const container = document.getElementById('article-reader-container');
+    if (container) {
+      container.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [slug]);
 
   useEffect(() => {
     async function loadAllData() {
@@ -141,10 +149,20 @@ export default function App() {
       >
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col gap-3 shrink-0">
           <div className="flex items-center justify-between">
-            <h1 id="app-title" className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500">
+            <h1 
+              id="app-title" 
+              className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-500 hover:text-blue-600 transition-colors cursor-pointer"
+              onClick={() => navigate('/')}
+            >
               Muslim Archive
             </h1>
             <div className="flex items-center gap-2">
+              <button 
+                onClick={() => navigate('/')}
+                className="lg:hidden p-1.5 text-slate-400 hover:text-slate-600"
+              >
+                <ArrowLeft size={16} />
+              </button>
               <button 
                 onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
                 className={cn(
